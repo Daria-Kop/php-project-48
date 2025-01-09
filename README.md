@@ -1,6 +1,7 @@
 ### Hexlet tests and linter status:
 [![Actions Status](https://github.com/Daria-Kop/php-project-48/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/Daria-Kop/php-project-48/actions)
-
+[![Maintainability](https://api.codeclimate.com/v1/badges/95e8c531d059b0ac8203/maintainability)](https://codeclimate.com/github/Daria-Kop/php-project-48/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/95e8c531d059b0ac8203/test_coverage)](https://codeclimate.com/github/Daria-Kop/php-project-48/test_coverage)
 ## Comparing 2 plane json files:
 [![asciicast](https://asciinema.org/a/WqJbPVioRizE6AakIPwkOb9pP.svg)](https://asciinema.org/a/WqJbPVioRizE6AakIPwkOb9pP)
 
