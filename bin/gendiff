@@ -1,20 +1,17 @@
 #!/usr/bin/env php
-
 <?php
-
-use function Differ\Differ\genDiff;
-
 $autoloadPath1 = __DIR__ . '/../../../autoload.php';
 $autoloadPath2 = __DIR__ . '/../vendor/autoload.php';
-
-
 if (file_exists($autoloadPath1)) {
     require_once $autoloadPath1;
 } else {
     require_once $autoloadPath2;
 }
 
-const DOC = <<<DOC
+use function Differ\Differ\gendiff;
+use function Gendiff\Misc\is_absolute_path;
+
+$doc = <<<DOC
 Generate diff
 
 Usage:
@@ -28,10 +25,18 @@ Options:
   --format <fmt>                Report format [default: stylish]
 DOC;
 
-$args = Docopt::handle(DOC, array('version' => '1.0'));
+$args = Docopt::handle($doc, array('version'=>'GenDiff 1.0'));
 
-$format = $args['--format'];
+//foreach ($args as $k=>$v)                          непонятно почему данные строки содержащиеся в README docopt ни на что не влияют при их отключении
+//    echo $k.': '.json_encode($v).PHP_EOL;
+
+$format = $args['--format'] ?? 'stylish';
+// var_dump($format);
 $firstFilePath = realpath($args['<firstFile>']);
 $secondFilePath = realpath($args['<secondFile>']);
-
-echo genDiff($firstFilePath, $secondFilePath, $format);
+if (!$firstFilePath or !$secondFilePath) {
+    echo "Something is wrong with the given paths!" . PHP_EOL;
+    } else {
+    echo gendiff($firstFilePath, $secondFilePath, $format);
+//    print_r(differ($firstFilePath, $secondFilePath, $format));
+    }

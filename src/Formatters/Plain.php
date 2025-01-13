@@ -1,30 +1,47 @@
 <?php
 
-namespace Differ\Formatters\Plain;
+namespace Gendiff\Formatters\Plain;
 
-function plain(array $mergedTree, string $accName = ''): string
+use Gendiff\Misc;
+
+function plain(array $input)
 {
-    $lines = array_map(function ($elem) use ($accName) {
-        $name = $elem['name'];
-        if ($elem['status'] === 'nested') {
-            //$accName .= $name . '.';
-            return plain($elem['child'], "{$accName}{$name}.");
-        } elseif ($elem['status'] === 'added') {
-            $value = is_object($elem['value']) ? '[complex value]' : var_export($elem['value'], true);
-            return "Property '{$accName}{$elem['name']}' was added with value: {$value}";
-        } elseif ($elem['status'] === 'removed') {
-            return "Property '{$accName}{$elem['name']}' was removed";
-        } elseif ($elem['status'] === 'changed') {
-            $oldVal = is_object($elem['oldValue']) ? '[complex value]' : var_export($elem['oldValue'], true);
-            $oldValRes = $oldVal === 'NULL' ? 'null' : $oldVal;
-            $newVal = is_object($elem['newValue']) ? '[complex value]' : var_export($elem['newValue'], true);
-            $newValRes = $newVal === 'NULL' ? 'null' : $newVal;
-            return "Property '{$accName}{$elem['name']}' was updated. From {$oldValRes} to {$newValRes}";
-        } elseif ((string) $elem['status'] === 'removed') {
-            return "Property '{$accName}{$elem['name']}' was removed";
-        };
-    }, $mergedTree);
+    return iter($input);
+}
 
-    $linesRes = array_filter($lines, fn($line) => $line);//claer clean lines from $lines array with value not changed.
-    return implode("\n", $linesRes);
+function iter(array $input, string $path = '')
+{
+    $result = array_map(function ($key, $value) use ($path) {
+        $string = null;
+        $currentKey = substr(strval($key), 2);              // отбрасываем служебные первые два символа
+        $realValue = (is_array($value) && array_key_exists('+value+', $value)) ? $value['+value+'] : $value;
+        $currentValue = normalizeValue($realValue);
+        $previousValue = (is_array($value) && array_key_exists('+other value+', $value)) ? normalizeValue($value['+other value+']) : null; // phpcs:ignore
+        if ((Misc\isAssoc($value)) and ($key[0] === " ")) {
+            $pathExtended = $path . $currentKey . ".";
+            return iter($value, $pathExtended);
+        } elseif (is_array($value) && array_key_exists('+removeThisLine+', $value)) {
+            return "";
+        } elseif (is_array($value) && array_key_exists('+other value+', $value)) {
+            return "Property '{$path}{$currentKey}' was updated. From {$previousValue} to {$currentValue}";
+        } elseif ($key[0] === "+") {
+            return "Property '{$path}{$currentKey}' was added with value: {$currentValue}";
+        } elseif ($key[0] === "-") {
+            return "Property '{$path}{$currentKey}' was removed";
+        }
+    }, array_keys($input), $input);
+    $string = implode(PHP_EOL, array_filter(Misc\flatten($result)));
+    return $string;
+}
+
+function normalizeValue(mixed $value)
+{
+    if (is_numeric($value)) {
+        return $value;
+    } elseif (!is_array($value)) {
+        $quotedValue = (in_array($value, ['true', 'false', 'null'], true)) ? $value : "'{$value}'";
+        return $quotedValue;
+    } else {
+        return '[complex value]';
+    }
 }

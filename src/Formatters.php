@@ -1,19 +1,20 @@
 <?php
 
-namespace Differ\Formatters;
+namespace Gendiff\Formatters;
 
-use function Differ\Formatters\Plain\plain;
-use function Differ\Formatters\Stylish\stylish;
-use function Differ\Formatters\Stylish\toString;
-use function Differ\Formatters\Json\json;
+use Gendiff\Formatters\Stylish;
+use Gendiff\Formatters\Plain;
+use Gendiff\Formatters\Json;
 
-function formatTree(string $format, array $tree)
+function format(array $diff, string $format)
 {
     if ($format === 'stylish') {
-        return toString(stylish($tree));
+        return Stylish\stylish($diff);
     } elseif ($format === 'plain') {
-        return plain($tree);
+        return Plain\plain($diff);
     } elseif ($format === 'json') {
-        return json($tree);
+        return Json\json($diff);
+    } else {
+        return "Invalid format!\n";
     }
 }
