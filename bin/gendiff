@@ -1,5 +1,10 @@
 #!/usr/bin/env php
+
 <?php
+
+use function Differ\Differ\genDiff;
+use function Differ\Parser\parse;
+
 $autoloadPath1 = __DIR__ . '/../../../autoload.php';
 $autoloadPath2 = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($autoloadPath1)) {
@@ -8,35 +13,27 @@ if (file_exists($autoloadPath1)) {
     require_once $autoloadPath2;
 }
 
-use function Differ\Differ\gendiff;
-use function Gendiff\Misc\is_absolute_path;
-
 $doc = <<<DOC
+
 Generate diff
 
-Usage:
-  gendiff (-h|--help)
-  gendiff (-v|--version)
-  gendiff [--format <fmt>] <firstFile> <secondFile>
+Usage: gendiff (-h | --help)
+       gendiff (-v | --version)
+       gendiff [--format <fmt>] <firstFile> <secondFile>
+
 
 Options:
-  -h --help                     Show this screen
-  -v --version                  Show version
-  --format <fmt>                Report format [default: stylish]
+    -h --help  Show this screen
+    -v --version  Show version
+    --format <fmt> Report format [default: stylish]
 DOC;
 
-$args = Docopt::handle($doc, array('version'=>'GenDiff 1.0'));
+$args = Docopt::handle($doc, ['version' => 'Generate diff 0.1']);
 
-//foreach ($args as $k=>$v)                          непонятно почему данные строки содержащиеся в README docopt ни на что не влияют при их отключении
-//    echo $k.': '.json_encode($v).PHP_EOL;
+if (!isset($args->args['--format'])) {
+    $format = 'stylish';
+} else {
+    $format = $args->args['--format'];
+}
 
-$format = $args['--format'] ?? 'stylish';
-// var_dump($format);
-$firstFilePath = realpath($args['<firstFile>']);
-$secondFilePath = realpath($args['<secondFile>']);
-if (!$firstFilePath or !$secondFilePath) {
-    echo "Something is wrong with the given paths!" . PHP_EOL;
-    } else {
-    echo gendiff($firstFilePath, $secondFilePath, $format);
-//    print_r(differ($firstFilePath, $secondFilePath, $format));
-    }
+print_r(genDiff($args->args['<firstFile>'], $args->args['<secondFile>'], $format));
