@@ -2,7 +2,8 @@
 
 namespace Differ\Formatters\Json;
 
-function json(array $tree): string
+function render(array $data): string
 {
-    return json_encode($tree);
+    $jsonData = json_encode($data, JSON_THROW_ON_ERROR);
+    return $jsonData;
 }

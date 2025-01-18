@@ -2,29 +2,79 @@
 
 namespace Differ\Formatters\Plain;
 
-function plain(array $mergedTree, string $accName = ''): string
-{
-    $lines = array_map(function ($elem) use ($accName) {
-        $name = $elem['name'];
-        if ($elem['status'] === 'nested') {
-            //$accName .= $name . '.';
-            return plain($elem['child'], "{$accName}{$name}.");
-        } elseif ($elem['status'] === 'added') {
-            $value = is_object($elem['value']) ? '[complex value]' : var_export($elem['value'], true);
-            return "Property '{$accName}{$elem['name']}' was added with value: {$value}";
-        } elseif ($elem['status'] === 'removed') {
-            return "Property '{$accName}{$elem['name']}' was removed";
-        } elseif ($elem['status'] === 'changed') {
-            $oldVal = is_object($elem['oldValue']) ? '[complex value]' : var_export($elem['oldValue'], true);
-            $oldValRes = $oldVal === 'NULL' ? 'null' : $oldVal;
-            $newVal = is_object($elem['newValue']) ? '[complex value]' : var_export($elem['newValue'], true);
-            $newValRes = $newVal === 'NULL' ? 'null' : $newVal;
-            return "Property '{$accName}{$elem['name']}' was updated. From {$oldValRes} to {$newValRes}";
-        } elseif ((string) $elem['status'] === 'removed') {
-            return "Property '{$accName}{$elem['name']}' was removed";
-        };
-    }, $mergedTree);
+use const Differ\Differ\ADDED;
+use const Differ\Differ\CHANGED;
+use const Differ\Differ\DELETED;
+use const Differ\Differ\NESTED;
+use const Differ\Differ\UNCHANGED;
 
-    $linesRes = array_filter($lines, fn($line) => $line);//claer clean lines from $lines array with value not changed.
-    return implode("\n", $linesRes);
+const COMPARE_TEXT_MAP = [
+    ADDED => 'added',
+    DELETED => 'removed',
+    CHANGED => 'updated',
+    UNCHANGED => '',
+    NESTED => '[complex value]',
+];
+
+function render(array $data): string
+{
+    $result = iter($data['children']);
+    return rtrim(implode($result), " \n");
+}
+
+function iter(array $value, array $acc = []): array
+{
+    $func = function ($val) use ($acc) {
+
+        if (!is_array($val)) {
+            return toString($val);
+        }
+
+        if (!array_key_exists(0, $val) && !array_key_exists('type', $val)) {
+            return toString($val);
+        }
+
+        $key = $val['key'];
+        $compare = $val['type'];
+        $compareText = COMPARE_TEXT_MAP[$compare];
+        $accNew = [...$acc, ...[$key]];
+
+        return match ($compare) {
+            ADDED => sprintf(
+                "Property '%s' was %s with value: %s\n",
+                implode('.', $accNew),
+                $compareText,
+                toString($val['value']),
+            ),
+            DELETED => sprintf(
+                "Property '%s' was %s\n",
+                implode('.', $accNew),
+                $compareText,
+            ),
+            CHANGED => sprintf(
+                "Property '%s' was %s. From %s to %s\n",
+                implode('.', $accNew),
+                $compareText,
+                toString($val['value1']),
+                toString($val['value2']),
+            ),
+            NESTED => implode(iter($val['children'], $accNew)),
+            default => null,
+        };
+    };
+
+    $result = array_map($func, $value);
+    return $result;
+}
+
+function toString(mixed $value): string
+{
+    return match (true) {
+        $value === true => 'true',
+        $value === false => 'false',
+        is_null($value) => 'null',
+        is_array($value) || is_object($value) => '[complex value]',
+        is_string($value) => "'{$value}'",
+        default => trim((string) $value, "'")
+    };
 }
