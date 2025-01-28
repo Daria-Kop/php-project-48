@@ -2,79 +2,62 @@
 
 namespace Differ\Formatters\Plain;
 
-use const Differ\Differ\ADDED;
-use const Differ\Differ\CHANGED;
-use const Differ\Differ\DELETED;
-use const Differ\Differ\NESTED;
-use const Differ\Differ\UNCHANGED;
-
-const COMPARE_TEXT_MAP = [
-    ADDED => 'added',
-    DELETED => 'removed',
-    CHANGED => 'updated',
-    UNCHANGED => '',
-    NESTED => '[complex value]',
-];
-
-function render(array $data): string
+function makePlain(array $data, string $path = ''): string
 {
-    $result = iter($data['children']);
-    return rtrim(implode($result), " \n");
-}
+    $result = array_map(function ($item) use ($path) {
+        $itemType = $item['type'];
+        $key = $item['key'];
+        $fullPath = "{$path}{$key}";
 
-function iter(array $value, array $acc = []): array
-{
-    $func = function ($val) use ($acc) {
-
-        if (!is_array($val)) {
-            return toString($val);
+        if ($itemType === 'added') {
+            $value = getString($item['value']);
+            return "Property '$fullPath' was added with value: {$value}\n";
         }
 
-        if (!array_key_exists(0, $val) && !array_key_exists('type', $val)) {
-            return toString($val);
+        if ($itemType === 'removed') {
+            return "Property '$fullPath' was removed\n";
         }
 
-        $key = $val['key'];
-        $compare = $val['type'];
-        $compareText = COMPARE_TEXT_MAP[$compare];
-        $accNew = [...$acc, ...[$key]];
+        if ($itemType === 'unchanged') {
+            return null;
+        }
 
-        return match ($compare) {
-            ADDED => sprintf(
-                "Property '%s' was %s with value: %s\n",
-                implode('.', $accNew),
-                $compareText,
-                toString($val['value']),
-            ),
-            DELETED => sprintf(
-                "Property '%s' was %s\n",
-                implode('.', $accNew),
-                $compareText,
-            ),
-            CHANGED => sprintf(
-                "Property '%s' was %s. From %s to %s\n",
-                implode('.', $accNew),
-                $compareText,
-                toString($val['value1']),
-                toString($val['value2']),
-            ),
-            NESTED => implode(iter($val['children'], $accNew)),
-            default => null,
-        };
-    };
+        if ($itemType === 'updated') {
+            $value1 = getString($item['value1']);
+            $value2 = getString($item['value2']);
+            return "Property '$fullPath' was updated. From {$value1} to {$value2}\n";
+        }
 
-    $result = array_map($func, $value);
-    return $result;
+        if ($itemType === 'nested') {
+            $nestedPath = "{$fullPath}.";
+            return makePlain($item['children'], $nestedPath);
+        }
+    }, $data);
+
+    return implode($result);
 }
 
-function toString(mixed $value): string
+function getString(mixed $value): string
 {
-    return match (true) {
-        $value === true => 'true',
-        $value === false => 'false',
-        is_null($value) => 'null',
-        is_array($value) || is_object($value) => '[complex value]',
-        is_string($value) => "'{$value}'",
-        default => trim((string) $value, "'")
-    };
+    if (is_bool($value)) {
+        return $value ? 'true' : 'false';
+    }
+    if (is_null($value)) {
+        return 'null';
+    }
+    if (is_array($value)) {
+        return '[complex value]';
+    }
+    if (is_int($value)) {
+        return $value;
+    }
+
+    return "'{$value}'";
+}
+
+function toPlain(array $diff): string
+{
+    $plain = makePlain($diff);
+
+    return rtrim($plain);
 }

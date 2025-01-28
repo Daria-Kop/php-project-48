@@ -2,105 +2,91 @@
 
 namespace Differ\Formatters\Stylish;
 
-use const Differ\Differ\ADDED;
-use const Differ\Differ\DELETED;
-use const Differ\Differ\CHANGED;
-use const Differ\Differ\NESTED;
-use const Differ\Differ\UNCHANGED;
+const INDENT_SYMBOL = ' ';
+const PLUS = '+';
+const MINUS = '-';
+const SPACE = ' ';
+const STEP = 4;
+const SYMBOL_REPEAT = 2;
 
-const SPACECOUNT = 4;
-const REPLACER = ' ';
-const COMPARE_TEXT_SYMBOL_MAP = [
-    ADDED => '+',
-    DELETED => '-',
-    CHANGED => ' ',
-    NESTED => ' ',
-    UNCHANGED => ' ',
-];
-
-function render(array $data): string
+function makeStylish(array $data, int $depth = 0): string
 {
-    $result = iter($data['children']);
-    return $result;
-}
+    $indent = getIndent($depth);
+    $result = array_map(function ($item) use ($depth, $indent) {
+        $itemType = $item['type'];
+        $key = $item['key'];
 
-function iter(array $value, int $depth = 1): string
-{
-    $func = function ($val) use ($depth) {
-        if (!is_array($val)) {
-            return toString($val);
+        if ($itemType === 'added') {
+            $value = getString($item['value'], $depth + STEP);
+            return $indent . getIndent(SYMBOL_REPEAT) . PLUS . " {$key}: {$value}\n";
         }
 
-        if (!array_key_exists(0, $val) && !array_key_exists('type', $val)) {
-            return toString($val);
+        if ($itemType === 'removed') {
+            $value = getString($item['value'], $depth + STEP);
+            return $indent . getIndent(SYMBOL_REPEAT) . MINUS . " {$key}: {$value}\n";
         }
 
-        $compare = $val['type'];
-        $delete = COMPARE_TEXT_SYMBOL_MAP[DELETED];
-        $add = COMPARE_TEXT_SYMBOL_MAP[ADDED];
-        $compareSymbol = COMPARE_TEXT_SYMBOL_MAP[$compare];
-        $key = $val['key'];
+        if ($itemType === 'unchanged') {
+            $value = getString($item['value'], $depth + STEP);
+            return $indent . getIndent(SYMBOL_REPEAT) . SPACE . " {$key}: {$value}\n";
+        }
 
-        return match ($compare) {
-            CHANGED => structure($val['value1'], $key, $delete, $depth) . structure($val['value2'], $key, $add, $depth),
-            NESTED => structure(iter($val['children'], $depth + 1), $key, $compareSymbol, $depth),
-            default => structure($val['value'], $key, $compareSymbol, $depth),
-        };
-    };
+        if ($itemType === 'updated') {
+            $value1 = getString($item['value1'], $depth + STEP);
+            $value2 = getString($item['value2'], $depth + STEP);
+            return $indent . getIndent(SYMBOL_REPEAT) . MINUS . " {$key}: {$value1}\n{$indent}" .
+                    getIndent(SYMBOL_REPEAT) . PLUS . " {$key}: {$value2}\n";
+        }
 
-    $result = array_map($func, $value);
-    $closeBracketIndentSize = $depth * SPACECOUNT;
-    $closeBracketIndent = $closeBracketIndentSize > 0 ? str_repeat(REPLACER, $closeBracketIndentSize - SPACECOUNT) : '';
+        if ($itemType === 'nested') {
+            $value = getString(makeStylish($item['children'], $depth + STEP));
+            return $indent . getIndent(SYMBOL_REPEAT) . SPACE . " {$key}: {\n{$value}" .
+                    getIndent(SYMBOL_REPEAT) . getIndent(SYMBOL_REPEAT) . "{$indent}}\n";
+        }
+    }, $data);
 
-    return "{\n" . implode($result) . "{$closeBracketIndent}}";
+    return implode($result);
 }
 
-function structure(mixed $value, string $key, string $compareSymbol, int $depth): string
+function getString(mixed $value, int $depth = 0): mixed
 {
-    $indentSize = ($depth * SPACECOUNT) - 2;
-    $currentIndent = str_repeat(REPLACER, $indentSize);
-    $depthNested = $depth + 1;
-    $valueStructured = depthStructuring($value, $depthNested);
-
-    $result = sprintf(
-        "%s%s %s: %s\n",
-        $currentIndent,
-        $compareSymbol,
-        $key,
-        $valueStructured,
-    );
-    return $result;
-}
-function depthStructuring(mixed $value, int $depth): string
-{
-    if (!is_array($value)) {
-        return toString($value);
+    if (is_bool($value)) {
+        return $value ? 'true' : 'false';
+    }
+    if (is_null($value)) {
+        return 'null';
+    }
+    if (is_array($value)) {
+        $result = toString($value, $depth);
+        $indent = getIndent($depth);
+        return "{{$result}\n{$indent}}";
     }
 
-    $indentSize = $depth * SPACECOUNT;
-    $currentIndent = str_repeat(REPLACER, $indentSize);
-
-    $fun = function ($key, $val) use ($depth, $currentIndent) {
-        return sprintf(
-            "%s%s: %s\n",
-            $currentIndent,
-            $key,
-            depthStructuring($val, $depth + 1),
-        );
-    };
-
-    $result = array_map($fun, array_keys($value), $value);
-    $closeBracketIndent = str_repeat(REPLACER, $indentSize - SPACECOUNT);
-
-    return "{\n" . implode($result) . "{$closeBracketIndent}}";
+    return $value;
 }
 
-function toString(mixed $value): string
+function toString(array $data, int $depth): string
 {
-    return match (true) {
-        $value === true => 'true',
-        $value === false => 'false',
-        is_null($value) => 'null',
-        default => trim((string) $value, "'")
-    };
+    $keys = array_keys($data);
+    $deeper = $depth + STEP;
+    $result = array_map(function ($key) use ($data, $deeper) {
+        $val = getString($data[$key], $deeper);
+        $indent = getIndent($deeper);
+        $result = "\n{$indent}{$key}: {$val}";
+        return $result;
+    }, $keys);
+
+    return implode('', $result);
+}
+
+function getIndent(int $depth): string
+{
+    return str_repeat(INDENT_SYMBOL, $depth);
+}
+
+function toStylish(array $diff): string
+{
+    $stylish = makeStylish($diff);
+
+    return "{\n{$stylish}}";
 }
